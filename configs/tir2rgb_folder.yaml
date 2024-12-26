@@ -6,7 +6,7 @@ image_save_iter: 1000         # How often do you want to save output images duri
 image_display_iter: 100       # How often do you want to display output images during training
 display_size: 8               # How many images do you want to display each time
 snapshot_save_iter: 10000     # How often do you want to save trained models
-log_iter: 1                   # How often do you want to log the training stats
+log_iter: 10                   # How often do you want to log the training stats
 
 # optimization options
 max_iter: 2000000             # maximum number of training iterations
@@ -53,6 +53,6 @@ new_size_b: 400
 # number of data loading threads
 #new_size: 256                               # first resize the shortest image side to this size
 crop_image_height: 400                     # random crop image of this height
-crop_image_width: 640                      # random crop image of this width
-data_root: ./datasets/tir2rgb/     # dataset folder location
-vgg_model_path: /home/hri/PycharmProjects/Thermal_optical_flow/MUNIT
+crop_image_width: 540                      # random crop image of this width
+data_root: /kaggle/input/rgb2ir/LLVIP_order      # dataset folder location
+vgg_model_path: /kaggle/working
