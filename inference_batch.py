@@ -23,7 +23,7 @@ import os
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--config', type=str, default='configs/edges2handbags_folder', help='Path to the config file.')
+parser.add_argument('--config', type=str, default='configs/tir2rgb_folder.yaml', help='Path to the config file.')
 parser.add_argument('--input_folder', type=str, help="input image folder")
 parser.add_argument('--output_folder', type=str, help="output image folder")
 parser.add_argument('--checkpoint', type=str, help="checkpoint of autoencoders")
