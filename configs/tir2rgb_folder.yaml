@@ -53,6 +53,6 @@ new_size_b: 400
 # number of data loading threads
 #new_size: 256                               # first resize the shortest image side to this size
 crop_image_height: 400                     # random crop image of this height
-crop_image_width: 640                      # random crop image of this width
+crop_image_width: 500                      # random crop image of this width
 data_root: /kaggle/input/flirlittle/FLIR_little      # dataset folder location
 vgg_model_path: /kaggle/working
