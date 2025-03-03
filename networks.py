@@ -223,7 +223,6 @@ class ContentEncoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, n_upsample, n_res, dim, output_dim, res_norm='adain', activ='relu', pad_type='zero'):
         super(Decoder, self).__init__()
-
         self.model = []
         # AdaIN residual blocks
         self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
@@ -236,18 +235,25 @@ class Decoder(nn.Module):
         self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
         self.model = nn.Sequential(*self.model)
 
+        # === 新增：ESRGAN模块 ===
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+        self.upscaler = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6)
+
     def forward(self, x):
-        return self.model(x)
+        out = self.model(x)
+        # === 超分处理 ===
+        out = self.upscaler(out)
+        return out
 
 ##################################################################################
 # Sequential Models
 ##################################################################################
 class ResBlocks(nn.Module):
-    def __init__(self, num_blocks, dim, norm='in', activation='relu', pad_type='zero'):
+    def __init__(self, num_blocks, dim, norm='in', activation='relu', pad_type='zero', cbam_reduction_ratio=16):
         super(ResBlocks, self).__init__()
         self.model = []
         for i in range(num_blocks):
-            self.model += [ResBlock(dim, norm=norm, activation=activation, pad_type=pad_type)]
+            self.model += [ResBlock(dim, norm=norm, activation=activation, pad_type=pad_type, cbam_reduction_ratio=cbam_reduction_ratio)]
         self.model = nn.Sequential(*self.model)
 
     def forward(self, x):
@@ -266,6 +272,32 @@ class MLP(nn.Module):
 
     def forward(self, x):
         return self.model(x.view(x.size(0), -1))
+#新增CBAM模块 Lucifer
+class CBAM(nn.Module):
+    def __init__(self, channels, reduction_ratio=16):
+        super(CBAM, self).__init__()
+        # 通道注意力
+        self.channel_attention = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(channels, channels // reduction_ratio, kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels // reduction_ratio, channels, kernel_size=1),
+            nn.Sigmoid()
+        )
+        # 空间注意力
+        self.spatial_attention = nn.Sequential(
+            nn.Conv2d(channels, 1, kernel_size=7, padding=3),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # 通道注意力
+        channel_att = self.channel_attention(x)
+        x = x * channel_att
+        # 空间注意力
+        spatial_att = self.spatial_attention(x)
+        x = x * spatial_att
+        return x
 
 ##################################################################################
 # Basic Blocks
@@ -278,7 +310,7 @@ class ResBlock(nn.Module):
         model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
         model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
         self.model = nn.Sequential(*model)
-
+        self.cbam = CBAM(dim, reduction_ratio=cbam_reduction_ratio) #Lucifer
     def forward(self, x):
         residual = x
         out = self.model(x)
