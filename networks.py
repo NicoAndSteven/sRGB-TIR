@@ -303,17 +303,21 @@ class CBAM(nn.Module):
 # Basic Blocks
 ##################################################################################
 class ResBlock(nn.Module):
-    def __init__(self, dim, norm='in', activation='relu', pad_type='zero'):
+    def __init__(self, dim, norm='in', activation='relu', pad_type='zero', cbam_reduction_ratio=16):
         super(ResBlock, self).__init__()
-
         model = []
-        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
-        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
+        model += [Conv2dBlock(dim, dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
+        model += [Conv2dBlock(dim, dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
         self.model = nn.Sequential(*model)
-        self.cbam = CBAM(dim, reduction_ratio=cbam_reduction_ratio) #Lucifer
+
+        # === 新增：CBAM模块 ===
+        self.cbam = CBAM(dim, reduction_ratio=cbam_reduction_ratio)
+
     def forward(self, x):
         residual = x
         out = self.model(x)
+        # === 加入CBAM加权 ===
+        out = self.cbam(out)
         out += residual
         return out
 
