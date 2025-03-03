@@ -55,6 +55,6 @@ new_size_b: 400
 #new_size: 256                               # first resize the shortest image side to this size
 crop_image_height: 400                     # random crop image of this height
 crop_image_width: 500                      # random crop image of this width
-data_root: /kaggle/input/flirpaired/FLIR      # dataset folder location
+data_root: /kaggle/input/vip400/VIP     # dataset folder location
 vgg_model_path: /kaggle/working
 mixup_alpha: 0.2  # 新增：MixUp数据增强参数
