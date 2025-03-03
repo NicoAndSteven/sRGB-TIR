@@ -5,7 +5,7 @@
 image_save_iter: 1000         # How often do you want to save output images during training
 image_display_iter: 100       # How often do you want to display output images during training
 display_size: 8               # How many images do you want to display each time
-snapshot_save_iter: 10000     # How often do you want to save trained models
+snapshot_save_iter: 5000     # How often do you want to save trained models
 log_iter: 100                   # How often do you want to log the training stats
 
 # optimization options
@@ -54,5 +54,5 @@ new_size_b: 400
 #new_size: 256                               # first resize the shortest image side to this size
 crop_image_height: 400                     # random crop image of this height
 crop_image_width: 500                      # random crop image of this width
-data_root: /kaggle/input/flirlittle/FLIR_little      # dataset folder location
+data_root: /kaggle/input/flirpaired/FLIR      # dataset folder location
 vgg_model_path: /kaggle/working
