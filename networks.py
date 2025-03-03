@@ -87,7 +87,6 @@ class MsImageDis(nn.Module):
 ##################################################################################
 
 class AdaINGen(nn.Module):
-    # AdaIN auto-encoder architecture
     def __init__(self, input_dim, params):
         super(AdaINGen, self).__init__()
         dim = params['dim']
@@ -107,6 +106,8 @@ class AdaINGen(nn.Module):
 
         # MLP to generate AdaIN parameters
         self.mlp = MLP(style_dim, self.get_num_adain_params(self.dec), mlp_dim, 3, norm='none', activ=activ)
+
+    # ...其他方法保持不变
 
     def forward(self, images):
         # reconstruct an image
@@ -213,7 +214,8 @@ class ContentEncoder(nn.Module):
             self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
             dim *= 2
         # residual blocks
-        self.model += [ResBlocks(n_res, dim, norm=norm, activation=activ, pad_type=pad_type)]
+        self.model += [ResBlocks(n_res, dim, norm=norm, activation=activ, pad_type=pad_type, 
+                               cbam_reduction_ratio=16)]  # 传递 cbam_reduction_ratio
         self.model = nn.Sequential(*self.model)
         self.output_dim = dim
 
@@ -248,12 +250,14 @@ class Decoder(nn.Module):
 ##################################################################################
 # Sequential Models
 ##################################################################################
+
 class ResBlocks(nn.Module):
     def __init__(self, num_blocks, dim, norm='in', activation='relu', pad_type='zero', cbam_reduction_ratio=16):
         super(ResBlocks, self).__init__()
         self.model = []
         for i in range(num_blocks):
-            self.model += [ResBlock(dim, norm=norm, activation=activation, pad_type=pad_type, cbam_reduction_ratio=cbam_reduction_ratio)]
+            self.model += [ResBlock(dim, norm=norm, activation=activation, pad_type=pad_type, 
+                                  cbam_reduction_ratio=cbam_reduction_ratio)]  # 传递 cbam_reduction_ratio
         self.model = nn.Sequential(*self.model)
 
     def forward(self, x):
