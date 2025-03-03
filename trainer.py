@@ -2,13 +2,44 @@
 Copyright (C) 2017 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
-from networks import AdaINGen, MsImageDis, VAEGen
-from utils import weights_init, get_model_list, vgg_preprocess, load_vgg16, get_scheduler
-from torch.autograd import Variable
-import torch
+from __future__ import print_function
+from __future__ import division
+
 import torch.nn as nn
+import torch.nn.parallel
+import torch.nn.functional as F
+import torch.backends.cudnn as cudnn
+import torch.distributed as dist
+import torch.optim as optim
+import torch.multiprocessing as mp
+import torch.utils.data
+import torch.utils.data.distributed
+from torch.autograd import Variable
+from torch.utils.data import Dataset, DataLoader
+
+import torchvision
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+import torchvision.models as models
+
+import argparse
 import os
-from LoG_loss import LogLoss, LogEachBlock
+import random
+import shutil
+import time
+import warnings
+import sys
+import matplotlib.pyplot as plt
+import copy
+
+import numpy as np
+
+import cv2
+
+# === 新增：导入HED模型 ===
+from hed import HED
+from networks import AdaINGen
+
 class MUNIT_Trainer(nn.Module):
     def __init__(self, hyperparameters):
         super(MUNIT_Trainer, self).__init__()
@@ -38,10 +69,10 @@ class MUNIT_Trainer(nn.Module):
         self.dis_scheduler = get_scheduler(self.dis_opt, hyperparameters)
         self.gen_scheduler = get_scheduler(self.gen_opt, hyperparameters)
 
-        # LoG
-
-        self.log_loss = LogLoss()
-
+        # === 新增：加载HED模型 ===
+        self.hed = HED(pretrained=True, model_path='network-bsds500.pytorch').cuda().eval()
+        for param in self.hed.parameters():
+            param.requires_grad = False
 
         # Network weight initialization
         self.apply(weights_init(hyperparameters['init']))
@@ -50,7 +81,7 @@ class MUNIT_Trainer(nn.Module):
 
         # Load VGG model if needed
         if 'vgg_w' in hyperparameters.keys() and hyperparameters['vgg_w'] > 0:
-            self.vgg = load_vgg16("/home/hri/PycharmProjects/Thermal_optical_flow/MUNIT/models/")
+            self.vgg = load_vgg16("C:/Users/86178/Desktop/SRGB-TIR/sRGB-TIR/vgg16")
             self.vgg.eval()
             for param in self.vgg.parameters():
                 param.requires_grad = False
@@ -58,19 +89,12 @@ class MUNIT_Trainer(nn.Module):
     def recon_criterion(self, input, target):
         return torch.mean(torch.abs(input - target))
 
-    def LoG_criterion(self, real, reconstructed):
-        return self.log_loss(reconstructed, real)
-
-    def forward(self, x_a, x_b):
-        self.eval()
-        s_a = Variable(self.s_a)
-        s_b = Variable(self.s_b)
-        c_a, s_a_fake = self.gen_a.encode(x_a)
-        c_b, s_b_fake = self.gen_b.encode(x_b)
-        x_ba = self.gen_a.decode(c_b, s_a)
-        x_ab = self.gen_b.decode(c_a, s_b)
-        self.train()
-        return x_ab, x_ba
+    def hed_edge_loss(self, img1, img2):
+        # 提取HED边缘图
+        edge1 = self.hed(img1)
+        edge2 = self.hed(img2)
+        # 计算L1损失
+        return torch.mean(torch.abs(edge1 - edge2))
 
     def gen_update(self, x_a, x_b, hyperparameters):
         self.gen_opt.zero_grad()
@@ -108,11 +132,10 @@ class MUNIT_Trainer(nn.Module):
         self.loss_gen_vgg_a = self.compute_vgg_loss(self.vgg, x_ba, x_b) if hyperparameters['vgg_w'] > 0 else 0
         self.loss_gen_vgg_b = self.compute_vgg_loss(self.vgg, x_ab, x_a) if hyperparameters['vgg_w'] > 0 else 0
 
-        #LoG Loss
-        self.log_loss_gen_recon_x_a = self.LoG_criterion(x_a_recon, x_a)
-        self.log_loss_gen_recon_x_b = self.LoG_criterion(x_b_recon, x_b)
-        #print(self.log_loss_gen_recon_x_a,self.log_loss_gen_recon_x_b)
-        self.log_coef = 20
+        # === 替换LoG损失为HED边缘损失 ===
+        self.hed_loss_recon_x_a = self.hed_edge_loss(x_a_recon, x_a)
+        self.hed_loss_recon_x_b = self.hed_edge_loss(x_b_recon, x_b)
+        hed_coef = 20  # 与原LoG权重一致
 
         # total loss
         self.loss_gen_total = hyperparameters['gan_w'] * self.loss_gen_adv_a + \
@@ -127,7 +150,8 @@ class MUNIT_Trainer(nn.Module):
                               hyperparameters['recon_x_cyc_w'] * self.loss_gen_cycrecon_x_b + \
                               hyperparameters['vgg_w'] * self.loss_gen_vgg_a + \
                               hyperparameters['vgg_w'] * self.loss_gen_vgg_b + \
-                              self.log_coef*self.log_loss_gen_recon_x_a + self.log_coef*self.log_loss_gen_recon_x_b
+                              hed_coef * self.hed_loss_recon_x_a + \
+                              hed_coef * self.hed_loss_recon_x_b
         self.loss_gen_total.backward()
         self.gen_opt.step()
 
