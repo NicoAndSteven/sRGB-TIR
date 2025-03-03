@@ -38,6 +38,7 @@ import cv2
 
 # === 新增：导入HED模型 ===
 from hed import HED
+from networks import AdaINGen
 
 class MUNIT_Trainer(nn.Module):
     def __init__(self, hyperparameters):
