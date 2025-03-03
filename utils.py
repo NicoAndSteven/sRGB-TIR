@@ -70,6 +70,17 @@ def get_all_data_loaders(conf):
                                                 new_size_b, height, width, num_workers, True)
         test_loader_b = get_data_loader_list(conf['data_folder_test_b'], conf['data_list_test_b'], batch_size, False,
                                                 new_size_b, new_size_b, new_size_b, num_workers, True)
+
+    alpha = config.get('mixup_alpha', 0.2)  # 从配置文件中读取MixUp参数
+    for i in range(len(train_loader_a.dataset)):
+        if random.random() < 0.5:  # 50%的概率应用MixUp
+            j = random.randint(0, len(train_loader_a.dataset) - 1)
+            image_a = train_loader_a.dataset[i]
+            image_b = train_loader_a.dataset[j]
+            mixed_image = alpha * image_a + (1 - alpha) * image_b
+            train_loader_a.dataset[i] = mixed_image
+
+    return train_loader_a, train_loader_b, test_loader_a, test_loader_b
     return train_loader_a, train_loader_b, test_loader_a, test_loader_b
 
 
