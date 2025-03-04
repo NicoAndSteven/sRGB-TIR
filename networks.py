@@ -227,11 +227,7 @@ class Decoder(nn.Module):
         self.model = []
         if use_rrdb:
             self.model += [RRDB(dim)]  # 插入RRDB模块
-        # 第一个上采样模块
-        self.model += [nn.Upsample(scale_factor=2),
-                       Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
-        # 更新 dim，反映通道数已降低
-        dim = dim // 2
+
         # AdaIN残差块使用更新后的 dim
         self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
         # 后续上采样模块
