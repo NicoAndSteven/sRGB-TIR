@@ -221,28 +221,31 @@ class ContentEncoder(nn.Module):
         return self.model(x)
 
 class Decoder(nn.Module):
-    def __init__(self, n_upsample, n_res, dim, output_dim, res_norm='adain', activ='relu', pad_type='zero',
-                 use_rrdb=False):
+    def __init__(self, n_upsample, n_res, dim, output_dim, res_norm='adain', activ='relu', pad_type='zero', use_rrdb=False):
         super(Decoder, self).__init__()
         self.use_rrdb = use_rrdb
         self.model = []
         if use_rrdb:
             self.model += [RRDB(dim)]  # 插入RRDB模块
-        self.model += [nn.Upsample(scale_factor=2),  # 上采样
+        # 第一个上采样模块
+        self.model += [nn.Upsample(scale_factor=2),
                        Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
-        # AdaIN residual blocks
+        # 更新 dim，反映通道数已降低
+        dim = dim // 2
+        # AdaIN残差块使用更新后的 dim
         self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
-        # upsampling blocks
+        # 后续上采样模块
         for i in range(n_upsample):
             self.model += [nn.Upsample(scale_factor=2),
                            Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
             dim //= 2
-        # use reflection padding in the last conv layer
+        # 最后一层输出层
         self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
         self.model = nn.Sequential(*self.model)
 
     def forward(self, x):
         return self.model(x)
+
 
 ##################################################################################
 # Sequential Models
