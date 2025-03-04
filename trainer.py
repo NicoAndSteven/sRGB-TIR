@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import os
 from LoG_loss import LogLoss, LogEachBlock
+from hed import HED
 class MUNIT_Trainer(nn.Module):
     def __init__(self, hyperparameters):
         super(MUNIT_Trainer, self).__init__()
@@ -19,6 +20,11 @@ class MUNIT_Trainer(nn.Module):
         self.dis_a = MsImageDis(hyperparameters['input_dim_a'], hyperparameters['dis'])  # discriminator for domain a
         self.dis_b = MsImageDis(hyperparameters['input_dim_b'], hyperparameters['dis'])  # discriminator for domain b
         self.instancenorm = nn.InstanceNorm2d(512, affine=False)
+        if hyperparameters['hed_w'] > 0:
+            self.hed = HED(pretrained=True, model_path='network-bsds500.pytorch')
+            self.hed.eval()
+            for param in self.hed.parameters():
+                param.requires_grad = False
         self.style_dim = hyperparameters['gen']['style_dim']
 
         # fix the noise used in sampling
@@ -85,6 +91,12 @@ class MUNIT_Trainer(nn.Module):
         # decode (cross domain)
         x_ba = self.gen_a.decode(c_b, s_a)
         x_ab = self.gen_b.decode(c_a, s_b)
+        if hyperparameters['hed_w'] > 0:
+            self.loss_gen_hed_a = self.compute_hed_loss(x_ba, x_b)
+            self.loss_gen_hed_b = self.compute_hed_loss(x_ab, x_a)
+        else:
+            self.loss_gen_hed_a = 0
+            self.loss_gen_hed_b = 0
         # encode again
         c_b_recon, s_a_recon = self.gen_a.encode(x_ba)
         c_a_recon, s_b_recon = self.gen_b.encode(x_ab)
@@ -127,10 +139,15 @@ class MUNIT_Trainer(nn.Module):
                               hyperparameters['recon_x_cyc_w'] * self.loss_gen_cycrecon_x_b + \
                               hyperparameters['vgg_w'] * self.loss_gen_vgg_a + \
                               hyperparameters['vgg_w'] * self.loss_gen_vgg_b + \
+                               hyperparameters['hed_w'] * (self.loss_gen_hed_a +self.loss_gen_hed_b ) +\
                               self.log_coef*self.log_loss_gen_recon_x_a + self.log_coef*self.log_loss_gen_recon_x_b
         self.loss_gen_total.backward()
         self.gen_opt.step()
 
+    def compute_hed_loss(self, img1, img2):
+        edge1 = self.hed(img1)
+        edge2 = self.hed(img2)
+        return F.l1_loss(edge1, edge2)
     def compute_vgg_loss(self, vgg, img, target):
         img_vgg = vgg_preprocess(img)
         target_vgg = vgg_preprocess(target)
