@@ -7,6 +7,7 @@ from utils import weights_init, get_model_list, vgg_preprocess, load_vgg16, get_
 from torch.autograd import Variable
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import os
 from LoG_loss import LogLoss, LogEachBlock
 from hed import HED
