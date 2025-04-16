@@ -58,5 +58,5 @@ new_size_b: 400
 #new_size: 256                               # first resize the shortest image side to this size
 crop_image_height: 400                     # random crop image of this height
 crop_image_width: 500                      # random crop image of this width
-data_root: /kaggle/input/vip400/VIP     # dataset folder location
+data_root: /kaggle/input/filr1700/F1700     # dataset folder location
 vgg_model_path: /kaggle/working
